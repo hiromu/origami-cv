@@ -24,13 +24,30 @@ const int LEFT = 5;
 const int LIMIT = 1000;
 const int RIGHT = 7;
 const int SPEED = 50;
-const int THRESHOLD = 150;
+const int THRESHOLD = 250;
 const int TIME = 50;
 const char* WINDOW_NAME = "OpenCV";
 
-int mode = 0, timer = 0;
+int mode = 0, timer = 0, selected = -1;
 cv::Mat transform;
+cv::Point2i correction[4] = {cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0)}; 
 std::vector<cv::Point2i> clicked;
+
+cv::Mat calc_transform(void) {
+    cv::Point2f src[4] = {cv::Point2f(0, 0), cv::Point2f(0, CAMERA_SIZE.height), cv::Point2f(CAMERA_SIZE.width, 0), cv::Point2f(CAMERA_SIZE.width, CAMERA_SIZE.height)};
+    cv::Point2f dst[4];
+    for(int i = 0; i < 4; i++) {
+        int minimum = INT_MAX;
+        for(int j = 0; j < (int)clicked.size(); j++) {
+            int distance = pow(src[i].x - clicked[j].x, 2) + pow(src[i].y - clicked[j].y, 2);
+            if(distance < minimum) {
+                minimum = distance;
+                dst[i] = clicked[j] + correction[i];
+            }
+        }
+    }
+    return cv::getPerspectiveTransform(dst, src);
+}
 
 void mouse_callback(int event, int x, int y, int flags)
 {
@@ -38,31 +55,16 @@ void mouse_callback(int event, int x, int y, int flags)
         if(mode == 0) {
             clicked.push_back(cv::Point2i(x, y));
             if(clicked.size() == 4) {
-                cv::Point2f src[4] = {cv::Point2f(0, 0), cv::Point2f(0, CAMERA_SIZE.height), cv::Point2f(CAMERA_SIZE.width, 0), cv::Point2f(CAMERA_SIZE.width, CAMERA_SIZE.height)};
-                cv::Point2f dst[4];
-                for(int i = 0; i < 4; i++) {
-                    int minimum = INT_MAX;
-                    for(int j = 0; j < (int)clicked.size(); j++) {
-                        int distance = pow(src[i].x - clicked[j].x, 2) + pow(src[i].y - clicked[j].y, 2);
-                        if(distance < minimum) {
-                            minimum = distance;
-                            dst[i] = clicked[j];
-                        }
-                    }
-                }
+                transform = calc_transform();
                 mode = 1;
-                transform = cv::getPerspectiveTransform(dst, src);
-                for(int i = 0; i < transform.cols; i++) {
-                    for(int j = 0; j < transform.rows; j++)
-                        std::cout << transform.at<int>(i, j) << " ";
-                    std::cout << std::endl;
-                }
+                selected = -1;
             }
         } else if(mode == 1) {
             mode = 2;
             timer = 0;
         } else if(mode == 2) {
             mode = 1;
+            selected = -1;
         }
     } else if(event == CV_EVENT_RBUTTONDOWN) {
         if(mode == 0 || mode == 1) {
@@ -254,8 +256,25 @@ int main(void)
         }
 
         int key = cv::waitKey(1);
-        if(key == 27)
+        if(key == 27) {
             break;
+        } else if(mode == 1) {
+            if(48 <= key && key <= 51) {
+                selected = key - 48;
+            } else if(selected != -1) {
+                if(key == 'w')
+                    correction[selected].x -= 1;
+                else if(key == 'a')
+                    correction[selected].y -= 1;
+                else if(key == 's')
+                    correction[selected].x += 1;
+                else if(key == 'd')
+                    correction[selected].y += 1;
+                else
+                    continue;
+                transform = calc_transform();
+            }
+        }
     }
 
     return 0;
