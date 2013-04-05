@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdlib>
+#include <iostream>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -18,6 +19,7 @@ cv::Vec3b SAND(0, 0, 0);
 cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 0), cv::Vec3b(0, 0, 255), cv::Vec3b(255, 255, 0), cv::Vec3b(255, 0, 255), cv::Vec3b(0, 255, 255)};
 
 const int AMOUNT = 500;
+const int CALIB_SIZE = 50;
 const int LEFT = 5;
 const int LIMIT = 1000;
 const int RIGHT = 7;
@@ -50,6 +52,11 @@ void mouse_callback(int event, int x, int y, int flags)
                 }
                 mode = 1;
                 transform = cv::getPerspectiveTransform(dst, src);
+                for(int i = 0; i < transform.cols; i++) {
+                    for(int j = 0; j < transform.rows; j++)
+                        std::cout << transform.at<int>(i, j) << " ";
+                    std::cout << std::endl;
+                }
             }
         } else if(mode == 1) {
             mode = 2;
@@ -87,10 +94,10 @@ int main(void)
             cap >> frame;
             for(int i = 0; i < clicked.size(); i++)
                 cv::circle(frame, clicked[i], 10, cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(20, 20), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(0, frame.rows - 20), cv::Point2i(20, frame.rows), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(frame.cols - 20, 0), cv::Point2i(frame.cols, 20), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(frame.cols - 20, frame.rows - 20), frame.size(), cv::Scalar(0, 0, 255, 0), -1);
+            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(CALIB_SIZE, CALIB_SIZE), cv::Scalar(0, 0, 255, 0), -1);
+            cv::rectangle(frame, cv::Point2i(0, frame.rows - CALIB_SIZE), cv::Point2i(CALIB_SIZE, frame.rows), cv::Scalar(0, 0, 255, 0), -1);
+            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, 0), cv::Point2i(frame.cols, CALIB_SIZE), cv::Scalar(0, 0, 255, 0), -1);
+            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, frame.rows - CALIB_SIZE), frame.size(), cv::Scalar(0, 0, 255, 0), -1);
             cv::imshow(WINDOW_NAME, frame);
         } else if(mode == 1) {
             cap >> frame;
