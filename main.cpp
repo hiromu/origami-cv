@@ -13,10 +13,10 @@
 cv::Size2i CAMERA_SIZE(1024, 768);
 cv::Size2i WINDOW_SIZE(800, 600);
 
-const int COLOR_NUM = 6;
+const int COLOR_NUM = 3;
 cv::Vec3b BACKGROUND(255, 255, 255);
 cv::Vec3b SAND(0, 0, 0);
-cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 0), cv::Vec3b(0, 0, 255), cv::Vec3b(255, 255, 0), cv::Vec3b(255, 0, 255), cv::Vec3b(0, 255, 255)};
+cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 0), cv::Vec3b(0, 0, 255)};
 
 const int AMOUNT = 500;
 const int CALIB_SIZE = 50;
@@ -24,7 +24,7 @@ const int LEFT = 5;
 const int LIMIT = 1000;
 const int RIGHT = 7;
 const int SPEED = 50;
-const int THRESHOLD = 250;
+const int THRESHOLD = 300;
 const int TIME = 50;
 const char* WINDOW_NAME = "OpenCV";
 
@@ -61,15 +61,19 @@ void mouse_callback(int event, int x, int y, int flags)
             }
         } else if(mode == 1) {
             mode = 2;
-            timer = 0;
         } else if(mode == 2) {
-            mode = 1;
-            selected = -1;
+            mode = 3;
+            timer = 0;
+        } else if(mode == 3) {
+            mode = 2;
         }
     } else if(event == CV_EVENT_RBUTTONDOWN) {
         if(mode == 0 || mode == 1) {
             mode = 0;
             clicked.clear();
+        } else if(mode == 2) {
+            mode = 1;
+            selected = -1;
         }
     }
 }
@@ -106,6 +110,10 @@ int main(void)
             cv::warpPerspective(frame, image, transform, frame.size());
             cv::imshow(WINDOW_NAME, image);
         } else if(mode == 2) {
+            cap >> frame;
+            frame = cv::Scalar(255, 255, 255);
+            cv::imshow(WINDOW_NAME, frame);
+        } else if(mode == 3) {
             if(timer == 0) {
                 cap >> frame;
                 cv::warpPerspective(frame, image, transform, frame.size());
@@ -263,13 +271,13 @@ int main(void)
                 selected = key - 48;
             } else if(selected != -1) {
                 if(key == 'w')
-                    correction[selected].x -= 1;
-                else if(key == 'a')
-                    correction[selected].y -= 1;
-                else if(key == 's')
-                    correction[selected].x += 1;
-                else if(key == 'd')
                     correction[selected].y += 1;
+                else if(key == 'a')
+                    correction[selected].x += 1;
+                else if(key == 's')
+                    correction[selected].y -= 1;
+                else if(key == 'd')
+                    correction[selected].x -= 1;
                 else
                     continue;
                 transform = calc_transform();
