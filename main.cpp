@@ -16,7 +16,7 @@ cv::Size2i WINDOW_SIZE(800, 600);
 const int COLOR_NUM = 3;
 cv::Vec3b BACKGROUND(255, 255, 255);
 cv::Vec3b SAND(0, 0, 0);
-cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 0), cv::Vec3b(0, 0, 255)};
+cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 255), cv::Vec3b(0, 0, 255)};
 
 const int AMOUNT = 500;
 const int CALIB_SIZE = 50;
