@@ -20,6 +20,7 @@ cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 255), cv:
 
 const int AMOUNT = 500;
 const int CALIB_SIZE = 50;
+const int EDGE = 2;
 const int LEFT = 5;
 const int LIMIT = 1000;
 const int RIGHT = 7;
@@ -134,7 +135,7 @@ int main(void)
                                 break;
                             }
                         }
-                        if(!flag)
+                        if(!flag || i < EDGE || i + EDGE > image.rows || j < EDGE || j + EDGE > image.cols)
                             for(int k = 0; k < 3; k++)
                                 image.data[image.step[0] * i + image.step[1] * j + k] = BACKGROUND[k];
                     }
