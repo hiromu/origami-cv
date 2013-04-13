@@ -34,6 +34,24 @@ cv::Mat transform;
 cv::Point2i correction[4] = {cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0)}; 
 std::vector<cv::Point2i> clicked;
 
+inline void update_color(cv::Mat &image, cv::Point2i point, cv::Vec3b color) {
+    for(int i = 0; i < 3; i++)
+        image.data[image.step[0] * point.x + image.step[1] * point.y + i] = color[i];
+}
+
+inline void swap_color(cv::Mat &image, cv::Point2i first, cv::Point2i second) {
+    for(int i = 0; i < 3; i++)
+        std::swap(image.data[image.step[0] * first.x + image.step[1] * first.y + i], image.data[image.step[0] * second.x + image.step[1] * second.y + i]);
+}
+
+inline bool compare_color(cv::Mat &image, cv::Point2i point, cv::Vec3b color) {
+    bool res = true;
+    for(int i = 0; i < 3; i++)
+        if(image.data[image.step[0] * point.x + image.step[1] * point.y + i] != color[i])
+            res = false;
+    return res;
+}
+
 cv::Mat calc_transform(void) {
     cv::Point2f src[4] = {cv::Point2f(0, 0), cv::Point2f(0, CAMERA_SIZE.height), cv::Point2f(CAMERA_SIZE.width, 0), cv::Point2f(CAMERA_SIZE.width, CAMERA_SIZE.height)};
     cv::Point2f dst[4];
@@ -130,14 +148,12 @@ int main(void)
                             if(sum < THRESHOLD) {
                                 flag = true;
                                 color_use[k] = true;
-                                for(int l = 0; l < 3; l++)
-                                    image.data[image.step[0] * i + image.step[1] * j + l] = COLORS[k][l];
+                                update_color(image, cv::Point2i(i, j), COLORS[k]);
                                 break;
                             }
                         }
                         if(!flag || i < EDGE || i + EDGE > image.rows || j < EDGE || j + EDGE > image.cols)
-                            for(int k = 0; k < 3; k++)
-                                image.data[image.step[0] * i + image.step[1] * j + k] = BACKGROUND[k];
+                            update_color(image, cv::Point2i(i, j), BACKGROUND);
                     }
                 }
 
@@ -153,105 +169,43 @@ int main(void)
                 if(timer < TIME) {
                     for(int i = 0; i < AMOUNT; i++) {
                         cv::Point2i sand(rand() % (image.cols - 10) + 5, rand() % image.rows / 4);
-
-                        bool flag = true;
-                        for(int j = 0; j < 3; j++) {
-                            if(image.data[image.step[0] * sand.y + image.step[1] * sand.x + j] != BACKGROUND[j]) {
-                                flag = false;
-                                break;
-                            }
-                        }
-
-                        if(flag)
-                            for(int j = 0; j < 3; j++)
-                                image.data[image.step[0] * sand.y + image.step[1] * sand.x + j] = SAND[j];
+                        if(compare_color(image, cv::Point2i(sand.y, sand.x), BACKGROUND))
+                            update_color(image, cv::Point2i(sand.y, sand.x), SAND);
                     }
                 }
 
                 for(int i = 0; i < image.rows; i++) {
                     for(int j = 0; j < image.cols; j++) {
-                        bool flag = true;
-                        for(int k = 0; k < 3; k++) {
-                            if(image.data[image.step[0] * i + image.step[1] * j + k] != SAND[k]) {
-                                flag = false;
-                                break;
-                            }
-                        }
-
-                        if(flag) {
+                        if(compare_color(image, cv::Point2i(i, j), SAND)) {
                             if(rand() % 100 < SPEED) {
-                                if(i == image.rows - 1) {
-                                    for(int k = 0; k < 3; k++)
-                                        image.data[image.step[0] * i + image.step[1] * j + k] = BACKGROUND[k];
-                                } else {
-                                    flag = true;
-                                    for(int k = 0; k < 3; k++) {
-                                        if(image.data[image.step[0] * (i + 1) + image.step[1] * j + k] != BACKGROUND[k]) {
-                                            flag = false;
-                                            break;
-                                        }
-                                    }
-
-                                    if(flag) {
-                                        for(int k = 0; k < 3; k++) { 
-                                            image.data[image.step[0] * i + image.step[1] * j + k] = image.data[image.step[0] * (i + 1) + image.step[1] * j + k];
-                                            image.data[image.step[0] * (i + 1) + image.step[1] * j + k] = SAND[k];
-                                        }
-                                    }
-                                }
+                                if(i == image.rows - 1)
+                                    update_color(image, cv::Point2i(i, j), BACKGROUND);
+                                else if(compare_color(image, cv::Point2i(i + 1, j), BACKGROUND))
+                                        swap_color(image, cv::Point2i(i, j), cv::Point2i(i + 1, j));
                             } else {
                                 int horizon = j;
                                 if(rand() % 2) {
-                                    for(int k = 1; k <= rand() % RIGHT + 1 && j + k < image.cols; k++) {
-                                        flag = true;
-                                        for(int l = 0; l < 3; l++) {
-                                            if(image.data[image.step[0] * i + image.step[1] * (j + k) + l] != BACKGROUND[l]) {
-                                                flag = false;
-                                                break;
-                                            }
-                                        }
-                                        if(flag)
+                                    for(int k = 1; k <= rand() % RIGHT + 1 && j + k < image.cols; k++)
+                                        if(compare_color(image, cv::Point2i(i, j + k), BACKGROUND))
                                             horizon = j + k;
-                                    }
                                 } else {
-                                    for(int k = 1; k <= rand() % LEFT + 1 && j - k >= 0; k++) {
-                                        flag = true;
-                                        for(int l = 0; l < 3; l++) {
-                                            if(image.data[image.step[0] * i + image.step[1] * (j - k) + l] != BACKGROUND[l]) {
-                                                flag = false;
-                                                break;
-                                            }
-                                        }
-                                        if(flag)
+                                    for(int k = 1; k <= rand() % LEFT + 1 && j - k >= 0; k++)
+                                        if(compare_color(image, cv::Point2i(i, j - k), BACKGROUND))
                                             horizon = j - k;
-                                    }
                                 }
 
-                                if(horizon != j) {
-                                    for(int k = 0; k < 3; k++) { 
-                                        image.data[image.step[0] * i + image.step[1] * j + k] = image.data[image.step[0] * i + image.step[1] * horizon + k];
-                                        image.data[image.step[0] * i + image.step[1] * horizon + k] = SAND[k];
-                                    }
-                                }
+                                if(horizon != j)
+                                    swap_color(image, cv::Point2i(i, j), cv::Point2i(i, horizon));
                             }
                         }
                     }
                 }
             } else if(score == -1) {
                 score = 0;
-                for(int i = 0; i < image.rows; i++) {
-                    for(int j = 0; j < image.cols; j++) {
-                        bool flag = true;
-                        for(int k = 0; k < 3; k++) {
-                            if(image.data[image.step[0] * i + image.step[1] * j + k] != SAND[k]) {
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if(flag)
+                for(int i = 0; i < image.rows; i++)
+                    for(int j = 0; j < image.cols; j++)
+                        if(compare_color(image, cv::Point2i(i, j), SAND))
                             score++;
-                    }
-                }
 
                 std::stringstream ss;
                 ss << "Score: " << score / color;
