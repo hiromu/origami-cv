@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <map>
+#include <queue>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -14,9 +17,9 @@ cv::Size2i CAMERA_SIZE(1024, 768);
 cv::Size2i WINDOW_SIZE(800, 600);
 
 const int COLOR_NUM = 3;
-cv::Vec3b BACKGROUND(255, 255, 255);
-cv::Vec3b SAND(0, 0, 0);
-cv::Vec3b COLORS[COLOR_NUM] = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255, 255), cv::Vec3b(0, 0, 255)};
+cv::Scalar BACKGROUND(255, 255, 255);
+cv::Scalar SAND(0, 0, 0);
+cv::Scalar COLORS[COLOR_NUM] = {cv::Scalar(255, 0, 0), cv::Scalar(0, 255, 255), cv::Scalar(0, 0, 255)};
 
 const int AMOUNT = 500;
 const int CALIB_SIZE = 50;
@@ -34,22 +37,29 @@ cv::Mat transform;
 cv::Point2i correction[4] = {cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0), cv::Point2i(0, 0)}; 
 std::vector<cv::Point2i> clicked;
 
-inline void update_color(cv::Mat &image, cv::Point2i point, cv::Vec3b color) {
-    for(int i = 0; i < 3; i++)
+inline void update_color(cv::Mat &image, cv::Point2i point, cv::Scalar color) {
+    for(int i = 0; i < image.channels(); i++)
         image.data[image.step[0] * point.x + image.step[1] * point.y + i] = color[i];
 }
 
 inline void swap_color(cv::Mat &image, cv::Point2i first, cv::Point2i second) {
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < image.channels(); i++)
         std::swap(image.data[image.step[0] * first.x + image.step[1] * first.y + i], image.data[image.step[0] * second.x + image.step[1] * second.y + i]);
 }
 
-inline bool compare_color(cv::Mat &image, cv::Point2i point, cv::Vec3b color) {
+inline bool compare_color(cv::Mat &image, cv::Point2i point, cv::Scalar color) {
     bool res = true;
-    for(int i = 0; i < 3; i++)
+    for(int i = 0; i < image.channels(); i++)
         if(image.data[image.step[0] * point.x + image.step[1] * point.y + i] != color[i])
             res = false;
     return res;
+}
+
+inline bool compare_color(cv::Mat &image, cv::Point2i point, cv::Scalar color, int threshold) {
+    int sum = 0;
+    for(int i = 0; i < 3; i++)
+        sum += std::abs(image.data[image.step[0] * point.x + image.step[1] * point.y + i] - color[i]);
+    return sum < threshold;
 }
 
 cv::Mat calc_transform(void) {
@@ -137,22 +147,55 @@ int main(void)
                 cap >> frame;
                 cv::warpPerspective(frame, image, transform, frame.size());
 
-                bool color_use[COLOR_NUM] = {false};
+                bool color_use[COLOR_NUM] = {false}, used[image.rows][image.cols];
+                std::vector<std::pair<cv::Point2i, int>> centers;
+                memset(used, 0, sizeof(used));
+
                 for(int i = 0; i < image.rows; i++) {
                     for(int j = 0; j < image.cols; j++) {
-                        bool flag = false;
+                        if(used[i][j])
+                            continue;
+
                         for(int k = 0; k < COLOR_NUM; k++) {
-                            int sum = 0;
-                            for(int l = 0; l < 3; l++)
-                                sum += abs(COLORS[k][l] - image.data[image.step[0] * i + image.step[1] * j + l]);
-                            if(sum < THRESHOLD) {
-                                flag = true;
+                            if(compare_color(image, cv::Point2i(i, j), COLORS[k], THRESHOLD)) {
+                                cv::Mat sharp(image.rows, image.cols, CV_8UC1, cv::Scalar(0));
+                                cv::Point2i move[4] = {cv::Point2i(1, 0), cv::Point2i(-1, 0), cv::Point2i(0, 1), cv::Point2i(0, -1)};
+                                std::queue<cv::Point2i> q;
+
+                                int count = 0;
+                                q.push(cv::Point2i(i, j));
                                 color_use[k] = true;
-                                update_color(image, cv::Point2i(i, j), COLORS[k]);
+
+                                while(!q.empty()) {
+                                    cv::Point2i point, current = q.front();
+                                    q.pop();
+                                    count++;
+
+                                    if(used[current.x][current.y])
+                                        continue;
+                                    used[current.x][current.y] = true;
+                                    update_color(sharp, current, cv::Scalar(255));
+                                    update_color(image, current, COLORS[k]);
+
+                                    for(int l = 0; l < 4; l++) {
+                                        point = current + move[l];
+                                        if(!(0 <= point.x && point.x < image.rows && 0 <= point.y && point.y < image.cols))
+                                            continue;
+                                        if(used[point.x][point.y])
+                                            continue;
+                                        if(compare_color(image, point, COLORS[k], THRESHOLD))
+                                            q.push(point);
+                                    }
+                                }
+
+                                cv::Moments center = cv::moments(sharp);
+                                centers.push_back(std::pair<cv::Point2i, int>(cv::Point2i((int)(center.m10 / center.m00), (int)(center.m01 / center.m00)), count));
+
                                 break;
                             }
                         }
-                        if(!flag || i < EDGE || i + EDGE > image.rows || j < EDGE || j + EDGE > image.cols)
+
+                        if(!used[i][j] || i < EDGE || i + EDGE > image.rows || j < EDGE || j + EDGE > image.cols)
                             update_color(image, cv::Point2i(i, j), BACKGROUND);
                     }
                 }
