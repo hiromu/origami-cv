@@ -252,7 +252,7 @@ int main(void)
 
                 std::stringstream ss;
                 ss << "Score: " << score / color;
-                cv::putText(image, ss.str(), cv::Point2i(50, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Vec3b(0, 0, 0), 2);
+                cv::putText(image, ss.str(), cv::Point2i(50, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 0), 2);
             }
 
             cv::imshow(WINDOW_NAME, image);
