@@ -27,11 +27,15 @@ void mouse_callback(int event, int x, int y, int flags)
                 selected = -1;
             }
         } else if(mode == 1) {
+            box = -1;
+            center = -1;
             mode = 2;
         } else if(mode == 2) {
             mode = 3;
             timer = 0;
         } else if(mode == 3) {
+            box = -1;
+            center = -1;
             mode = 2;
         }
     } else if(event == CV_EVENT_RBUTTONDOWN) {
@@ -47,11 +51,12 @@ void mouse_callback(int event, int x, int y, int flags)
 
 int main(void)
 {
-    int color, score, **field[2];
+    double **imos;
+    int color = 0, score = 0;
     cv::Mat frame, image;
 
     srand(time(NULL));
-    cv::VideoCapture cap(1);
+    cv::VideoCapture cap(0);
     if(!cap.isOpened())
         return 1;
 
@@ -65,37 +70,58 @@ int main(void)
     while(true) {
         if(mode == 0) {
             cap >> frame;
-            for(int i = 0; i < clicked.size(); i++)
-                cv::circle(frame, clicked[i], 10, cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(CALIB_SIZE, CALIB_SIZE), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(0, frame.rows - CALIB_SIZE), cv::Point2i(CALIB_SIZE, frame.rows), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, 0), cv::Point2i(frame.cols, CALIB_SIZE), cv::Scalar(0, 0, 255, 0), -1);
-            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, frame.rows - CALIB_SIZE), frame.size(), cv::Scalar(0, 0, 255, 0), -1);
+            for(int i = 0; i < (int)clicked.size(); i++)
+                cv::circle(frame, clicked[i], 10, cv::Scalar(0, 0, 255), -1);
+            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(CALIB_SIZE, CALIB_SIZE), cv::Scalar(0, 0, 255), -1);
+            cv::rectangle(frame, cv::Point2i(0, frame.rows - CALIB_SIZE), cv::Point2i(CALIB_SIZE, frame.rows), cv::Scalar(0, 0, 255), -1);
+            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, 0), cv::Point2i(frame.cols, CALIB_SIZE), cv::Scalar(0, 0, 255), -1);
+            cv::rectangle(frame, cv::Point2i(frame.cols - CALIB_SIZE, frame.rows - CALIB_SIZE), frame.size(), cv::Scalar(0, 0, 255), -1);
             cv::imshow(WINDOW_NAME, frame);
         } else if(mode == 1) {
             cap >> frame;
+
             cv::warpPerspective(frame, image, transform, frame.size());
             cv::imshow(WINDOW_NAME, image);
         } else if(mode == 2) {
             cap >> frame;
             frame = cv::Scalar(255, 255, 255);
+
+            if(center == -1) {
+                center = rand() % (frame.cols - BOX_DIFF * 2) + BOX_DIFF;
+                if(center <= BOX_DIFF) {
+                    box = center + BOX_DIFF + rand() % (frame.cols - (center + BOX_DIFF));
+                } else if(frame.cols - center <= BOX_DIFF) {
+                    box = center - BOX_DIFF - rand() % (center - BOX_DIFF);
+                } else {
+                    if(rand() % 2)
+                        box = center + BOX_DIFF + rand() % (frame.cols - (center + BOX_DIFF));
+                    else
+                        box = center - BOX_DIFF - rand() % (center - BOX_DIFF);
+                }
+            }
+
+            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(EDGE_FIELD, frame.rows), cv::Scalar(0, 0, 0), -1);
+            cv::rectangle(frame, cv::Point2i(0, 0), cv::Point2i(frame.cols, EDGE_FIELD), cv::Scalar(0, 0, 0), -1);
+            cv::rectangle(frame, cv::Point2i(frame.cols - EDGE_FIELD, 0), cv::Point2i(frame.cols, frame.rows), cv::Scalar(0, 0, 0), -1);
+            cv::rectangle(frame, cv::Point2i(0, frame.rows - EDGE_FIELD), cv::Point2i(frame.cols, frame.rows), cv::Scalar(0, 0, 0), -1);
+
+            cv::Point2i triangle[3] = {cv::Point2i(center, EDGE_FIELD * 0.75), cv::Point2i(center - EDGE_FIELD * 0.25, EDGE_FIELD * 0.25), cv::Point2i(center + EDGE_FIELD * 0.25, EDGE_FIELD * 0.25)};
+            cv::fillConvexPoly(frame, triangle, 3, cv::Scalar(0, 255, 0));
+            
             cv::imshow(WINDOW_NAME, frame);
         } else if(mode == 3) {
             if(timer == 0) {
                 cap >> frame;
                 cv::warpPerspective(frame, image, transform, frame.size());
 
-                int buffer[2][image.rows][image.cols];
                 bool color_use[COLOR_NUM] = {false}, used[image.rows][image.cols];
+                std::vector<std::pair<cv::Point2i, int>> center;
 
                 memset(used, 0, sizeof(used));
-                for(int i = 0; i < 2; i++) {
-                    field[i] = (int **)malloc(sizeof(int *) * image.rows);
-                    for(int j = 0; j < image.rows; j++) {
-                        field[i][j] = (int *)malloc(sizeof(int) * image.cols);
-                        memset(field[i][j], 0, sizeof(int) * image.cols);
-                    }
-                }
+                imos = (double **)malloc(sizeof(double *) * image.cols);
+                for(int i = 0; i < image.cols; i++)
+                    imos[i] = (double *)malloc(sizeof(double) * image.rows);
+                sands.clear();
 
                 for(int i = 0; i < image.rows; i++) {
                     for(int j = 0; j < image.cols; j++) {
@@ -135,60 +161,7 @@ int main(void)
                                 }
 
                                 cv::Moments moment = cv::moments(sharp);
-                                cv::Point2i center(moment.m01 / moment.m00, moment.m10 / moment.m00);
-                                memset(buffer, 0, sizeof(buffer));
-
-                                if(center.x < 0) {
-                                    count *= pow(RATIO, -center.x);
-                                    center.x = 0;
-                                } else if(center.x >= image.rows) {
-                                    count *= pow(RATIO, center.x - image.rows + 1);
-                                    center.x = image.rows - 1;
-                                }
-                                if(center.y < 0) {
-                                    count *= pow(RATIO, -center.y);
-                                    center.y = 0;
-                                } else if(center.y >= image.cols) {
-                                    count *= pow(RATIO, center.y - image.cols + 1);
-                                    center.y = image.cols - 1;
-                                }
-
-                                if(center.x > 0)
-                                    buffer[0][center.x - 1][center.y] = count;
-                                if(center.x < image.rows - 1)
-                                    buffer[0][center.x + 1][center.y] = -count;
-                                if(center.y > 0)
-                                    buffer[1][center.x][center.y - 1] = count;
-                                if(center.y < image.cols - 1)
-                                    buffer[1][center.x][center.y + 1] = -count;
-
-                                for(int l = center.x - 2; l >= 0; l--)
-                                    buffer[0][l][center.y] = buffer[0][l + 1][center.y] * RATIO;
-                                for(int l = center.x + 2; l < image.rows; l++)
-                                    buffer[0][l][center.y] = buffer[0][l - 1][center.y] * RATIO;
-                                for(int l = 0; l < image.rows; l++) {
-                                    for(int m = center.y - 1; m >= 0; m--)
-                                        buffer[0][l][m] = buffer[0][l][m + 1] * RATIO;
-                                    for(int m = center.y + 1; m < image.cols; m++)
-                                        buffer[0][l][m] = buffer[0][l][m - 1] * RATIO;
-                                }
-
-                                for(int l = center.y - 2; l >= 0; l--)
-                                    buffer[1][center.x][l] = buffer[1][center.x][l + 1] * RATIO;
-                                for(int l = center.y + 2; l < image.cols; l++)
-                                    buffer[1][center.x][l] = buffer[1][center.x][l - 1] * RATIO;
-                                for(int l = 0; l < image.cols; l++) {
-                                    for(int m = center.x - 1; m >= 0; m--)
-                                        buffer[1][m][l] = buffer[1][m + 1][l] * RATIO;
-                                    for(int m = center.x + 1; m < image.rows; m++)
-                                        buffer[1][m][l] = buffer[1][m - 1][l] * RATIO;
-                                }
-
-                                for(int l = 0; l < 2; l++)
-                                    for(int m = 0; m < image.rows; m++)
-                                        for(int n = 0; n < image.cols; n++)
-                                            field[l][m][n] += buffer[l][m][n];
-
+                                center.push_back(std::pair<cv::Point2i, int>(cv::Point2i(moment.m10 / moment.m00, moment.m01 / moment.m00), count));
                                 break;
                             }
                         }
@@ -198,17 +171,44 @@ int main(void)
                     }
                 }
 
+                for(int i = 0; i < image.rows; i++) {
+                    for(int j = 0; j < image.cols; j++) {
+                        imos[j][i] = 0;
+                        for(int k = 0; k < (int)center.size(); k++) {
+                            if(hypot(center[k].first.x - j, center[k].first.y - k) < 1000) {
+                                if(j > center[k].first.x)
+                                    imos[j][i] += center[k].second * pow(RATIO, hypot(center[k].first.x - j, center[k].first.y - i));
+                                else if(j < center[k].first.x)
+                                    imos[j][i] -= center[k].second * pow(RATIO, hypot(center[k].first.x - j, center[k].first.y - i));
+                            }
+                        }
+                    }
+                }
+
+                frame = image.clone();
+
 #ifdef DEBUG
-                int maximum[2] = {INT_MIN};
-                for(int i = 0; i < image.rows; i++)
-                    for(int j = 0; j < image.cols; j++)
-                        for(int k = 0; k < 2; k++)
-                            maximum[k] = std::max(maximum[k], std::abs(field[k][i][j]));
+                for(int i = 0; i < (int)center.size(); i++)
+                    cv::circle(image, center[i].first, 10, cv::Scalar(0, 128, 128, 0), -1);
+                cv::imshow(WINDOW_NAME, image);
+                cv::waitKey(0);
 
-                for(int i = 0; i < image.rows; i++)
-                    for(int j = 0; j < image.cols; j++)
-                        update_color(image, cv::Point2i(i, j), cv::Scalar(std::abs(field[0][i][j]) * 255 / maximum[0], std::abs(field[1][i][j]) * 255 / maximum[1], 0));
+                double minimum = DBL_MAX, maximum = DBL_MIN;
+                for(int i = 0; i < image.rows; i++) {
+                    for(int j = 0; j < image.cols; j++) {
+                        minimum = std::min(minimum, imos[j][i]);
+                        maximum = std::max(maximum, imos[j][i]);
+                    }
+                }
 
+                for(int i = 0; i < image.rows; i++) {
+                    for(int j = 0; j < image.cols; j++) {
+                        if(imos[j][i] > 0)
+                            update_color(image, cv::Point2i(i, j), cv::Scalar(255 * imos[j][i] / maximum, 0, 0));
+                        else if(imos[j][i] < 0)
+                            update_color(image, cv::Point2i(i, j), cv::Scalar(0, 255 * abs(imos[j][i]) / abs(minimum), 0));
+                    }
+                }
                 cv::imshow(WINDOW_NAME, image);
                 cv::waitKey(0);
 #endif
@@ -221,71 +221,47 @@ int main(void)
                 color = std::max(color, 1);
             }
 
+            cv::Mat field = frame.clone();
+            frame = image.clone();
+
             if(timer < LIMIT) {
                 if(timer < TIME) {
                     for(int i = 0; i < AMOUNT; i++) {
-                        cv::Point2i sand(rand() % 20 + SAND_POSITION - 10, rand() % 20);
-                        if(compare_color(image, cv::Point2i(sand.y, sand.x), BACKGROUND))
-                            update_color(image, cv::Point2i(sand.y, sand.x), SAND);
+                        cv::Point2i sand(rand() % 20, rand() % 20 + center - 10);
+                        if(compare_color(field, cv::Point2i(sand.y, sand.x), BACKGROUND))
+                            sands.push_back(Sand(sand, cv::Vec2d(rand() % ACCEL + 1, 0), cv::Vec2d(0, 0)));
                     }
                 }
 
-                for(int i = 0; i < image.rows; i++) {
-                    for(int j = 0; j < image.cols; j++) {
-                        if(compare_color(image, cv::Point2i(i, j), SAND)) {
-                            if(rand() % 100 < SPEED) {
-                                int vertical = i;
-                                for(int k = 1; k <= std::max(field[0][i][j], 1) && i + k < image.rows; k++) {
-                                    if(!compare_color(image, cv::Point2i(i + k, j), BACKGROUND))
-                                        break;
-                                    vertical = i + k;
-                                }
+                for(std::vector<Sand>::iterator it = sands.begin(); it != sands.end(); it++) {
+                    cv::Point2i position = it->getPosition();
+                    it->addAcceleration(cv::Vec2d(0, imos[position.y][position.x] / 100000));
 
-                                if(vertical >= image.rows - 1)
-                                    update_color(image, cv::Point2i(i, j), BACKGROUND);
-                                else if(vertical != i)
-                                    swap_color(image, cv::Point2i(i, j), cv::Point2i(vertical, j));
-                            } else {
-                                int horizon = j;
-                                if(rand() % (RIGHT + LEFT) < RIGHT) {
-                                    for(int k = 1; k <= std::max(field[1][i][j], 1) && j + k < image.cols; k++) {
-                                        if(!compare_color(image, cv::Point2i(i, j + k), BACKGROUND))
-                                            break;
-                                        horizon = j + k;
-                                    }
-                                } else {
-                                    for(int k = 1; k <= std::max(field[1][i][j], 1) && j - k >= 0; k++) {
-                                        if(!compare_color(image, cv::Point2i(i, j - k), BACKGROUND))
-                                            break;
-                                        horizon = j - k;
-                                    }
-                                }
-
-                                if(horizon != j)
-                                    swap_color(image, cv::Point2i(i, j), cv::Point2i(i, horizon));
-                            }
-                        }
+                    if(!it->move(frame)) {
+                        it = sands.erase(it);
+                        it--;
                     }
                 }
             } else if(score == -1) {
                 score = 0;
-                for(int i = 0; i < image.rows; i++)
-                    for(int j = 0; j < image.cols; j++)
-                        if(compare_color(image, cv::Point2i(i, j), SAND))
+                for(int i = 0; i < field.rows; i++)
+                    for(int j = 0; j < field.cols; j++)
+                        if(compare_color(field, cv::Point2i(i, j), SAND))
                             score++;
 
-                for(int i = 0; i < 2; i++) {
-                    for(int j = 0; j < image.rows; j++)
-                        free(field[i][j]);
-                    free(field[i]);
-                }
+                for(int i = 0; i < image.cols; i++)
+                    free(imos[i]);
+                free(imos);
 
                 std::stringstream ss;
                 ss << "Score: " << score / color;
-                cv::putText(image, ss.str(), cv::Point2i(50, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 0), 2);
+                cv::putText(field, ss.str(), cv::Point2i(50, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 0), 2);
+
+                image = field.clone();
+                frame = field;
             }
 
-            cv::imshow(WINDOW_NAME, image);
+            cv::imshow(WINDOW_NAME, frame);
             timer += 1;
         } else {
             break;
