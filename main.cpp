@@ -107,6 +107,7 @@ int main(void)
 
             cv::Point2i triangle[3] = {cv::Point2i(center, EDGE_FIELD * 0.75), cv::Point2i(center - EDGE_FIELD * 0.25, EDGE_FIELD * 0.25), cv::Point2i(center + EDGE_FIELD * 0.25, EDGE_FIELD * 0.25)};
             cv::fillConvexPoly(frame, triangle, 3, cv::Scalar(0, 255, 0));
+            cv::rectangle(frame, cv::Point2i(box - BOX_SIZE / 2, frame.rows - EDGE_FIELD * 0.75), cv::Point2i(box + BOX_SIZE / 2, frame.rows - EDGE_FIELD * 0.25), cv::Scalar(0, 255, 0), -1);
             
             cv::imshow(WINDOW_NAME, frame);
         } else if(mode == 3) {

@@ -14,6 +14,7 @@ const cv::Scalar COLORS[COLOR_NUM] = {cv::Scalar(255, 0, 0), cv::Scalar(0, 0, 25
 const int ACCEL = 20;
 const int AMOUNT = 300;
 const int BOX_DIFF = 100;
+const int BOX_SIZE = 100;
 const int CALIB_SIZE = 20;
 const int EDGE = 2;
 const int EDGE_FIELD = 20;
