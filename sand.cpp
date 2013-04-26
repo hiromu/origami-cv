@@ -24,12 +24,12 @@ bool Sand::move(cv::Mat &image)
         velocity[1] *= 0.85;
 
         int i, x = velocity[0], y = velocity[1] + rand() % (LEFT + RIGHT) - LEFT;
-        for(i = 0; i < MOVE_CHECK; i++)
+        for(i = 1; i < MOVE_CHECK; i++)
             if(!compare_color(image, cv::Point2i(coordinate.x + x * i / MOVE_CHECK, coordinate.y + y * i / MOVE_CHECK), BACKGROUND))
                 break;
 
-        coordinate.x += x * i / MOVE_CHECK;
-        coordinate.y += y * i / MOVE_CHECK;
+        coordinate.x += x * (i - 1) / MOVE_CHECK;
+        coordinate.y += y * (i - 1) / MOVE_CHECK;
 
         if(coordinate.x < 0 || image.rows <= coordinate.x)
             return false;

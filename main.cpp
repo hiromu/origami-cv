@@ -89,14 +89,14 @@ int main(void)
             if(center == -1) {
                 center = rand() % (frame.cols - BOX_DIFF * 2) + BOX_DIFF;
                 if(center <= BOX_DIFF) {
-                    box = center + BOX_DIFF + rand() % (frame.cols - (center + BOX_DIFF));
+                    box = center + BOX_DIFF + BOX_SIZE / 2 + rand() % (frame.cols - (center + BOX_DIFF - BOX_SIZE));
                 } else if(frame.cols - center <= BOX_DIFF) {
-                    box = center - BOX_DIFF - rand() % (center - BOX_DIFF);
+                    box = center - BOX_DIFF - BOX_SIZE / 2 - rand() % (center - (BOX_DIFF + BOX_SIZE));
                 } else {
                     if(rand() % 2)
-                        box = center + BOX_DIFF + rand() % (frame.cols - (center + BOX_DIFF));
+                        box = center + BOX_DIFF + BOX_SIZE / 2 + rand() % (frame.cols - (center + BOX_DIFF + BOX_SIZE));
                     else
-                        box = center - BOX_DIFF - rand() % (center - BOX_DIFF);
+                        box = center - BOX_DIFF - BOX_SIZE / 2 - rand() % (center - (BOX_DIFF + BOX_SIZE));
                 }
             }
 
@@ -176,7 +176,7 @@ int main(void)
                     for(int j = 0; j < image.cols; j++) {
                         imos[j][i] = 0;
                         for(int k = 0; k < (int)center.size(); k++) {
-                            if(hypot(center[k].first.x - j, center[k].first.y - k) < 1000) {
+                            if(hypot(center[k].first.x - j, center[k].first.y - k) < EFFECT_DIST) {
                                 if(j > center[k].first.x)
                                     imos[j][i] += center[k].second * pow(RATIO, hypot(center[k].first.x - j, center[k].first.y - i));
                                 else if(j < center[k].first.x)
@@ -185,6 +185,10 @@ int main(void)
                         }
                     }
                 }
+
+                cv::rectangle(image, cv::Point2i(box - BOX_SIZE / 2, image.rows - EDGE_FIELD * 0.75), cv::Point2i(box + BOX_SIZE / 2, image.rows - EDGE_FIELD * 0.25), cv::Scalar(0, 255, 0), -1);
+                cv::rectangle(image, cv::Point2i(box - BOX_SIZE / 2 - EDGE_FIELD * 0.25, image.rows - EDGE_FIELD * 0.75 - BOX_SIZE), cv::Point2i(box - BOX_SIZE / 2 + EDGE_FIELD * 0.25, image.rows - EDGE_FIELD * 0.25), cv::Scalar(0, 255, 0), -1);
+                cv::rectangle(image, cv::Point2i(box + BOX_SIZE / 2 - EDGE_FIELD * 0.25, image.rows - EDGE_FIELD * 0.75 - BOX_SIZE), cv::Point2i(box + BOX_SIZE / 2 + EDGE_FIELD * 0.25, image.rows - EDGE_FIELD * 0.25), cv::Scalar(0, 255, 0), -1);
 
                 frame = image.clone();
 
@@ -228,7 +232,7 @@ int main(void)
             if(timer < LIMIT) {
                 if(timer < TIME) {
                     for(int i = 0; i < AMOUNT; i++) {
-                        cv::Point2i sand(rand() % 20, rand() % 20 + center - 10);
+                        cv::Point2i sand(rand() % SAND_WIDTH, rand() % SAND_WIDTH + center - SAND_WIDTH);
                         if(compare_color(field, cv::Point2i(sand.y, sand.x), BACKGROUND))
                             sands.push_back(Sand(sand, cv::Vec2d(rand() % ACCEL + 1, 0), cv::Vec2d(0, 0)));
                     }
@@ -236,7 +240,7 @@ int main(void)
 
                 for(std::vector<Sand>::iterator it = sands.begin(); it != sands.end(); it++) {
                     cv::Point2i position = it->getPosition();
-                    it->addAcceleration(cv::Vec2d(0, imos[position.y][position.x] / 100000));
+                    it->addAcceleration(cv::Vec2d(0, imos[position.y][position.x] / AFFECT));
 
                     if(!it->move(frame)) {
                         it = sands.erase(it);
@@ -245,9 +249,9 @@ int main(void)
                 }
             } else if(score == -1) {
                 score = 0;
-                for(int i = 0; i < field.rows; i++)
-                    for(int j = 0; j < field.cols; j++)
-                        if(compare_color(field, cv::Point2i(i, j), SAND))
+                for(int i = box - BOX_SIZE / 2 - EDGE_FIELD * 0.25; i <= box + BOX_SIZE / 2 + EDGE_FIELD * 0.25; i++)
+                    for(int j = field.rows - EDGE_FIELD * 0.75 - BOX_SIZE; j <= field.rows - EDGE_FIELD * 0.25; j++)
+                        if(compare_color(field, cv::Point2i(j, i), SAND))
                             score++;
 
                 for(int i = 0; i < image.cols; i++)
